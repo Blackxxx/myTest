@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project name="YOcTools" default="run">
+
+    <property file="local.properties" />
+    <property environment="env" />
+
+    <condition property="sdk.dir" value="${env.ANDROID_SDK_HOME}">
+        <isset property="env.ANDROID_SDK_HOME" />
+    </condition>
+
+    <loadproperties srcFile="project.properties" />
+
+    <!-- quick check on sdk.dir -->
+    <fail message="sdk.dir is missing. Make sure to generate local.properties using 'android update project' or to inject it through the ANDROID_HOME environment variable."
+        unless="sdk.dir" />
+
+    <!-- version-tag: 1 -->
+    <import file="${sdk.dir}/tools/ant/build.xml" />
+
+    <target name="-post-package">
+        <delete dir="output" verbose="${verbose}" />
+    </target>
+
+    <macrodef name="signer_apk">
+        <attribute name="platform" />
+        <sequential>
+            <!-- <echo> ${out.packaged.file} </echo> -->
+            <if>
+                <condition>
+                    <available file="./signjar/@{platform}/" type="dir"></available>
+                </condition>
+                <then>
+                    <echo>signer platforme key apk for @{platform}</echo>
+
+                    <!-- 系统签名-->
+                    <exec executable="java" failonerror="true">
+                        <arg value="-jar"/>
+                        <arg value="./signjar/signapk_.jar"/>
+                        <arg value="./signjar/@{platform}/platform.x509.pem"/>
+                        <arg value="./signjar/@{platform}/platform.pk8"/>
+                        <arg value="${out.packaged.file}"/>
+                        <arg value="${out.absolute.dir}/${ant.project.name}.apk"/>
+                    </exec>
+
+                    <!-- 签名apk拷贝至输出打包目录 -->
+                    <mkdir dir="output"/>
+                    <move file="${out.absolute.dir}/${ant.project.name}.apk" todir="output" />
+                </then>
+                <else>
+                    <echo>path ./signjar/@{platforme}/ not found !</echo>
+                </else>
+            </if>
+        </sequential>
+    </macrodef>
+
+    <target name="-pre-compile">
+        <if>
+            <condition>
+                <and>
+                    <isset property="replace.android.jar"/>
+                    <available file="./${replace.android.jar}/" type="dir"></available>
+                </and>
+            </condition>
+            <then>
+                <!--重新定义 bootclasspathref="project.target.class.path" 让自定义的库排最前 -->
+                <path id="project.replace.android.jar">
+                    <!--	<pathelement location="${replace.android.jar}/${replace.android.jar}_classes.jar"></pathelement> -->
+                    <fileset dir="${replace.android.jar}">
+                        <include name="**/*.jar"/>
+                    </fileset>
+                    <pathelement path="${sdk.dir}/platforms/${target}/data/layoutlib.jar"/>
+                    <path path="${toString:project.target.class.path}"></path>
+                </path>
+                <path id="project.target.class.path">
+                    <path refid="project.replace.android.jar"></path>
+                </path>
+                <echo> replace android jar to ${toString:project.target.class.path} </echo>
+            </then>
+            <else>
+                <echo>path: ./${replace.android.jar}/ not found !</echo>
+            </else>
+        </if>
+    </target>
+
+    <!-- Yunovo 签名 -->
+    <target name="-yunovo-signer-apk" depends="release">
+        <echo>Yunovo signer apk ...</echo>
+        <signer_apk  platform="yunovo"/>
+    </target>
+
+    <target name="run" depends="-yunovo-signer-apk">
+        <echo>done!</echo>
+    </target>
+
+</project>
